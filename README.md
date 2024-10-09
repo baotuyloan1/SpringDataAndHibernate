@@ -27,3 +27,17 @@ are among the most widely used frameworks to solve this
 problem. Each of them comes with its own characteristics,
 advantages, and shortcomings. Selecting one of them should be
 a decision with appropriate fundamentals.
+
+## Content 
+1. Understanding object/relational persistence
+  - What is persistence?
+    - Relational Database
+    - Understanding SQL
+    - Using SQL in Java
+  - The paradigm mismatch
+    - The problem of granularity
+    - The problem of inheritance.
+    - The problem of identify.
+    - The problem of associations.
+    - The problem of data navigations.
+  - ORM, JPA, Hibernate and Spring Data
