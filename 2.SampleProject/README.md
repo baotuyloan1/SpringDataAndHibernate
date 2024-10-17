@@ -125,3 +125,55 @@ It may look like we're trying to be cute here; in fact, we're demonstrating an i
 We don't have to use annotations to map a persistent class. Other mapping options, such as the JPA orm.xml mapping file and the native hbm.xml mapping files, and we'll look at when they're a better solution than source annotations which are the most frequently used approach nowadays.</br></br>
 The Message class is now ready. We can store instances in our database and write queries to load them again into application memory.
 6. Storing and loading messages</br></br>
+Save a new Message to the database using Hibernate
+```java
+public class HelloWorldJPATest {
+   @Test
+   public void storeLoadMessage() {
+      EntityManagerFactory emf =
+              Persistence.createEntityManagerFactory("ch02");
+      try {
+         EntityManager em = emf.createEntityManager();
+         em.getTransaction().begin();
+         Message message = new Message();
+         message.setText("Hello World!");
+         em.persist(message);
+         em.getTransaction().commit();
+//INSERT into MESSAGE (ID, TEXT) values (1, 'Hello World!')
+         em.getTransaction().begin();
+         List<Message> messages =
+                 em.createQuery("select m from Message m", Message.class)
+                         .getResultList();
+//SELECT * from MESSAGE
+         messages.get(messages.size() - 1).
+                 setText("Hello World from JPA!");
+         em.getTransaction().commit();
+//UPDATE MESSAGE set TEXT = 'Hello World from JPA! where ID = 1
+         assertAll(
+                 () -> assertEquals(1, messages.size()),
+                 () -> assertEquals("Hello World from JPA!",
+                         messages.get(0).getText())
+         );
+         em.close();
+      } finally {
+         emf.close();
+      }
+   }
+}
+```
+First we need an EntityManagerFactory to talk to the database. This API represents the persistence unit, and most applications have one EntityManagerFactory for one configured persistence unit. Once it starts, the application should create the EntityManagerFactory; the factory is thread-safe, and all code in the application that accesses the database should share it. </br> </br>
+Begin a new session with the database by creating an EntityManager. This is the context for all persistence operations. </br></br>
+Create a new instance of the mapped domain model, and set its text property.</br></br>
+Enlist the transient instance with the persistence context; we make it persistent. Hibernate now knows that we wish to store that data, but it doesn't necessarily call the database immediately.</br></br>
+Commit the transaction, Hibernate automatically checks the persistence context and executes the necessary SQL INSERT statement. Hibernate inserts a row in the MESSAGE table, with an automatically generated value for the ID primary key column, and the TEXT value.</br</br>
+Every interaction with the database should occur within transaction boundaries, even if we're only reading data, so we start a new transaction. Any potential failure appearing from now on will not affect the previously committed transaction.</br></br>
+Execute a query to retrieve all instances of Message from the database.</br</br>
+We can change the value of a property. Hibernate detects this automatically because the loaded Message is still attached to the persistence context it was loaded in. </br></br>
+On commit, Hibernate checks the persistence context for dirty state, and it executes the SQL UPDATE automatically to synchronize in-memory objects with the database state.</br></br>
+Check the size of the list of messages retrieved from the database.</br></br>
+Check that the message we persisted is in the database. We use the JUnit 5 assertAll method, which always checks all the assertions that are passed to it, even if some of them fail., The two assertions that we verify are conceptually related. </br></br>
+We created an EntityManager, so we must close it.</br>
+We created an EntityManagerFactory, so we must close it</br>
+The query language you've seen in this example isn't SQL, it's the Jakarta Persistence Query Language (JPQL). Although there is syntactically no difference in this trivial example, the Message in the query string doesn't refer to the database table name but to the persistent class name. For this reason, the Message class name in the query is case-sensitive. If we map the class to a different table, the query will still work.</br></br>
+Also, notice how Hibernate detects the modification to the text property of the message and automatically updates the database. This is the automatic dirty-checking feature of JPA in action. It saves us the effort of explicitly asking the persistence manager to update the database when we modify the state of an instance inside a transaction.</br></br>
+2.4 Native Hibernate configuration
