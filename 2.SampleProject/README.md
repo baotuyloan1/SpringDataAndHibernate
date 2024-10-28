@@ -291,7 +291,8 @@ persistence manager to update the database when we modify the state of an instan
 ```xml
 <?xml version='1.0' encoding='utf-8'?>
 <!DOCTYPE hibernate-configuration PUBLIC
-        "-//Hibernate/Hibernate Configuration DTD//EN http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+        "-//Hibernate/Hibernate Configuration DTD//EN"
+        "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
 <hibernate-configuration>
     <session-factory>
         <property name="hibernate.connection.driver_class">
@@ -300,13 +301,14 @@ persistence manager to update the database when we modify the state of an instan
         <property name="hibernate.connection.url">
             jdbc:mysql://localhost:3306/springdataandhibernate?serverTimezone=UTC
         </property>
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQL8Dialect</property>
         <property name="hibernate.connection.username">root</property>
-        <property name="hibernate.connection.password"></property>
+        <property name="hibernate.connection.password">mysql</property>
         <property name="hibernate.connection.pool_size">50</property>
         <property name="show_sql">true</property>
         <property name="hibernate.hbm2ddl.auto">create</property>
     </session-factory>
-</hibernate-configuration>
+</hibernate-configuration>  
 ```
 
 We use the tags to indicate that we are configuring Hibernate.</br></br>
@@ -328,8 +330,8 @@ public class HelloWorldHibernateTest {
     private static SessionFactory createSessionFactory() {
         Configuration configuration = new Configuration();
         configuration.configure().addAnnotatedClass(Message.class);
-        
-        
+
+
         ServiceRegistry serviceRegistry = new
                 StandardServiceRegistryBuilder().
                 applySettings(configuration.getProperties()).build();
@@ -367,10 +369,193 @@ public class HelloWorldHibernateTest {
 ```
 
 To create a SessionFactory, we first need to create a configuration.</br>
-We need to call the configure method on it and to add Message to it as an annotated class. The execution of the configure method will load the content of the default hibernate.cfg.xml file </br>
-This builder pattern helps us create the immutable service registry and configure it by applying settings with chained method calls. A ServiceRegistry hosts and manages services that need access to the SessionFactory. Services are classes that provide pluggable implementations of different types of functionally to Hibernate. </br></br>
+We need to call the configure method on it and to add Message to it as an annotated class. The execution of the
+configure method will load the content of the default hibernate.cfg.xml file </br>
+This builder pattern helps us create the immutable service registry and configure it by applying settings with chained
+method calls. A ServiceRegistry hosts and manages services that need access to the SessionFactory. Services are classes
+that provide pluggable implementations of different types of functionally to Hibernate. </br></br>
 Build a SessionFactory using the configuration and the service registry we have previously created.</br>
-The SessionFactory created with createSessionFactory method we previously defined is passed as an argument to a try with resources, as SessionFactory implements the AutoCloseable interface.</br>
-Similarly, we begin a new session with the database by creating a Session, which also implements the AutoCloseable interface. This is our context for all persistence operations. </br>
+The SessionFactory created with createSessionFactory method we previously defined is passed as an argument to a try with
+resources, as SessionFactory implements the AutoCloseable interface.</br>
+Similarly, we begin a new session with the database by creating a Session, which also implements the AutoCloseable
+interface. This is our context for all persistence operations. </br>
 Get access to the standard transaction API and begin a transaction on this thread of execution.</br>
-Create a new instance of the mapped domain model class Message, and set its text property.
+Create a new instance of the mapped domain model class Message, and set its text property.</br></br>
+Enlist the transient instance with the persistence context; we make it persistent. Hibernate now knows that we wish to
+store that data, but it doesn't necessarily call the database immediately. The native Hibernate API is pretty similar to
+the standard JPA, and most methods have the same name.</br></br>
+Synchronize the session with the database, and close the current session on commit of the transaction
+automatically.</br></br>
+Begin another transaction. Every interaction with the database should occur within transaction boundaries, even if we're
+only reading data.</br>
+Create an instance of CriteriaQuery by calling the CriteriaBuilder createQuery() method. A CriteriaBuilder is used to
+construct criteria queries, compound selections, expression, predicates and orderings. A CriteriaQuery defines
+functionality that is specific top-level queries. A CriteriaBuilder and CriteriaQuery belong to the Criteria API, which
+allows us to build a query programmatically. </br></br>
+Create and add a query root corresponding to the given Message entity.</br>
+Call the getResultList() method of the query object to get the results. The query that is created and executed will be
+SELECT * FROM MESSAGE.</br>
+Commit the transaction.</br>
+Check the size of the list of messages retrieved from the database.</br></br>
+
+8. Switching between JPA and Hibernate:</br>
+   Suppose you're working with JPA and need to access the Hibernate API. Or, vice versa, you're working with native
+   Hibernate and you need to create an EntityManagerFactory from the Hibernate configuration. To obtain a SessionFactory
+   from an EntityManagerFactory, you'll have to unwrap the first one from the second one.
+
+```java
+import org.hibernate.SessionFactory;
+
+import javax.persistence.EntityManagerFactory;
+
+private static SessionFactory getSessionFactory(EntityManagerFactory entityManagerFactory) {
+    return entityManagerFactory.unwrap(SessionFactory.class);
+}
+```
+
+Starting with JPA version 2.0, you can get access to the APIs of the underlying implementations. The
+EntityManagerFactory (and also the EntityManager) declares an unwrap method that will return objects belonging to the
+classes of the JPA implementation. When a particular feature is only available in Hibernate, you can switch to it using
+the unwrap method.</br>
+You may be interested in the reverse operation: creating an EntityManagerFactory from an initial Hibernate
+configuration. </br>
+
+```java
+import com.manning.javapersistence.helloworld.Message;
+import org.hibernate.cfg.Configuration;
+
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+
+private static EntityManagerFactory createEntityManagerFactory() {
+    Configuration configuration = new Configuration();
+    configuration.configure().addAnnotatedClass(Message.class);
+
+    Map<String, String> properties = new HashMap<>();
+    Enumeration<?> propertyNames = configuration.getProperties().propertyNames();
+    while (propertyNames.hasMoreElements()) {
+        String element = (String) propertyNames.nextElement();
+        properties.put(element, configuration.getProperties().getProperty(element));
+    }
+
+    return Persistence.createEntityManagerFactory("HelloWorld", properties);
+}
+```
+
+9. "Hello World" with Spring Data JPA:</br></br>
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.data</groupId>
+    <artifactId>spring-data-jpa</artifactId>
+    <version>2.7.0</version>
+</dependency>
+<dependency>
+<groupId>org.springframework</groupId>
+<artifactId>spring-test</artifactId>
+<version>5.3.20</version>
+</dependency>
+```
+
+The spring-data-jpa module provides repository support for JPA and includes transitive dependencies on other modules
+we'll need, such as spring-core and spring-context.</br></br>
+We also need the spring-test dependency to run the tests.</br>
+The standard configuration file for Spring Data JPA is Java class that creates and sets up the beans needed by Spring
+Data. The configuration can be done using an XML file or Java code. Create the following configuration:
+
+```java
+
+@EnableJpaRepositories("com.manning.javapersistence.helloworld.properties")
+public class SpringDataConfiguration {
+
+    public DataSource dataSource() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setDriverClassName("com.mysql.jdbc.Driver");
+        dataSource.setUrl("jdbc:mysql://localhost:3306/springdataandhibernate");
+        dataSource.setUsername("root");
+        dataSource.setPassword("mysql");
+        return dataSource;
+    }
+
+    @Bean
+    public JpaTransactionManager transactionManager(EntityManagerFactory emf) {
+        return new JpaTransactionManager(emf);
+    }
+
+    @Bean
+    public JpaVendorAdapter jpaVendorAdapter() {
+        HibernateJpaVendorAdapter jpaVendorAdapter = new HibernateJpaVendorAdapter();
+        jpaVendorAdapter.setShowSql(true);
+        jpaVendorAdapter.setDatabase(Database.MYSQL);
+        return jpaVendorAdapter;
+    }
+
+    @Bean
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
+        LocalContainerEntityManagerFactoryBean localContainerEntityManagerFactoryBean = new LocalContainerEntityManagerFactoryBean();
+        localContainerEntityManagerFactoryBean.setDataSource(dataSource());
+        Properties properties = new Properties();
+        properties.put("hibernate.hbm2ddl.auto", "create");
+        localContainerEntityManagerFactoryBean.setJpaProperties(properties);
+        localContainerEntityManagerFactoryBean.setJpaVendorAdapter(jpaVendorAdapter());
+        localContainerEntityManagerFactoryBean.setPackagesToScan("com.manning.javapersistence.helloworld");
+        return localContainerEntityManagerFactoryBean;
+    }
+}
+```
+
+- The @EnableJpaRepositories annotation enables scanning of the package received as an argument for Spring Data
+  Repositories. </br>
+- Create a transaction manager been based on an entity manager factory. Every interaction with the database should occur
+  within transaction boundaries, and Spring Data needs a transaction manager bean.</br>
+- Create the JPA vendor adapter bean needed by JPA to interact with Hibernate.</br>
+- Create a LocalContainerEntityManagerFactoryBean. This is a factory bean that produces an EntityManagerFactory
+  following the JPA standard container bootstrap contract. </br>
+- Spring Data JPA provides support for JPA-based data access layers by reducing the boilerplate code and creating
+  implementations for the repository interfaces. We only need to define our own repository interface to extend one of
+  the Spring Data interfaces.
+
+```java
+public interface MessageRepository extends CrudRepository<Message, Long> {
+}
+
+```
+
+The MessageRepository interface extends CrudRepository<Message, Long>. This means that is a repository of Message with a
+Long identifier. Remember, the Message class has an id field annotated as @Id if type Long. We can directly call methods
+such as save, findAll, or findById which are inherited from CrudRepository, and we can use them without any other
+additional information to execute the usual operations against a database. Spring Data JPA will create a proxy class
+implementing the MessageRepository interface and implement its method.![img.png](img.png)
+```java
+
+@ExtendWith(SpringExtension.class)
+@ContextConfiguration(classes = {SpringDataConfiguration.class})
+public class HelloWorldSpringDataJPATest {
+
+    @Autowired
+    private MessageRepository messageRepository;
+
+    @Test
+    public void storeLoadMessage() {
+        Message message = new Message();
+        message.setText("Hello World from Spring Data JPA");
+        messageRepository.save(message);
+        List<Message> messages = (List<Message>) messageRepository.findAll();
+
+        assertAll(
+                () -> assertEquals(1, messages.size()),
+                () -> assertEquals("Hello World from Spring Data JPA", messages.get(0).getText())
+        );
+    }
+```
+Extend the test using SpringExtension. This extension is used to integrate the Spring test context with the JUni5 Jupiter test.</br>
+Spring test context is configured using the beans defined in the previously presented SpringDataConfiguration class.</br>
+A MessageRepository bean is injected by Spring through autowiring. This is possible as the com.manning.javapersistence.helloworld.repositories package where Message Repository is located was used as the argument of @EnableJpaRepositories annotation. If we call messageRepository.getClass(), we'll see that it returns something like jdk.proxy2.$Proxy41-a proxy generated by Spring Data.</br>
+Create a new instance of the mapped domain model class Message and set its text property.
+Persist the message object. The save method is inherited from the CrudRepository interface, and its body will be generated by Spring Data JPA when the proxy class is created. It will simply save a Message entity to the database. </br>
+Retrieve the messages from the repository. The findAll method is inherited from the CrudRepository interface, and its body will be generated by Spring Data JPA
+when the proxy class is created. It will simply return all entities belonging to the Message class. 
